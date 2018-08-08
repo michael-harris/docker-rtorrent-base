@@ -4,6 +4,7 @@ FROM lsiobase/alpine:3.7
 ARG MEDIAINF_VER="18.05"
 ARG RTORRENT_VER="0.9.7"
 ARG LIBTORRENT_VER="0.13.7"
+ARG CURL_VER="7.61.0"
 
 # set env
 ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
@@ -14,6 +15,8 @@ ENV PGID=0
 ENV RTORRENT_SCGI=0
     
 RUN NB_CORES=${BUILD_CORES-`getconf _NPROCESSORS_CONF`} && \
+  apk update && \
+  apk upgrade && \
   apk add --no-cache \
     bash-completion \
     ca-certificates \
@@ -53,6 +56,13 @@ RUN NB_CORES=${BUILD_CORES-`getconf _NPROCESSORS_CONF`} && \
         linux-headers \
         curl-dev \
         libressl-dev && \
+# compile curl to fix ssl for rtorrent
+cd /tmp && \
+mkdir curl && \
+cd curl && \
+wget -qO- https://curl.haxx.se/download/curl-${CURL_VER}.tar.gz | tar xz --strip 1 && \
+./configure --with-ssl && make -j ${NB_CORES} && make install && \
+ldconfig /usr/bin && ldconfig /usr/lib && \
 # compile xmlrpc-c
 cd /tmp && \
 svn checkout http://svn.code.sf.net/p/xmlrpc-c/code/stable xmlrpc-c && \
@@ -96,15 +106,11 @@ cd /tmp/mediainfo && \
 cd /tmp/mediainfo/MediaInfo/Project/GNU/CLI && \
       make install && \
 # cleanup
-apk del --purge \
-      build-dependencies && \
+apk del --purge build-dependencies && \
 apk del -X http://dl-cdn.alpinelinux.org/alpine/v3.6/main cppunit-dev && \
-rm -rf \
-      /tmp/* && \
+rm -rf /tmp/* && \
 # create home folder
 mkdir /home/torrent     
-# add local files
-COPY includes/ /
 
 # ports and volumes
 EXPOSE 51415 6882
